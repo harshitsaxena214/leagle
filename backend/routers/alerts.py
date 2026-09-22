@@ -5,6 +5,7 @@ from core.database import get_db
 from models.alert import Alert
 import asyncio
 import json
+from core.auth import get_current_user, get_current_user_ws
 
 router = APIRouter()
 
@@ -31,7 +32,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 @router.get("/")
-async def get_alerts(db: AsyncSession = Depends(get_db), limit: int = 50):
+async def get_alerts(db: AsyncSession = Depends(get_db), limit: int = 50, user: dict = Depends(get_current_user)):
     result = await db.execute(
         select(Alert).order_by(desc(Alert.sent_at)).limit(limit)
     )
@@ -46,7 +47,7 @@ async def get_alerts(db: AsyncSession = Depends(get_db), limit: int = 50):
     ]
 
 @router.patch("/{alert_id}/acknowledge")
-async def acknowledge_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
+async def acknowledge_alert(alert_id: str, db: AsyncSession = Depends(get_db), user: dict = Depends(get_current_user)):
     await db.execute(
         update(Alert).where(Alert.id == alert_id).values(acknowledged=True)
     )
@@ -56,6 +57,11 @@ async def acknowledge_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
 @router.websocket("/ws")
 async def websocket_alerts(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
     """Real-time alert stream via WebSocket."""
+    user = await get_current_user_ws(websocket)
+    if user is None:
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
         while True:

@@ -119,7 +119,7 @@ _auth = [Depends(get_current_user)]
 app.include_router(regulations.router, prefix="/api/regulations", tags=["regulations"], dependencies=_auth)
 app.include_router(policies.router, prefix="/api/policies", tags=["policies"], dependencies=_auth)
 app.include_router(impact.router, prefix="/api/impact", tags=["impact"], dependencies=_auth)
-app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"], dependencies=_auth)
+app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(rag.router, prefix="/api/rag", tags=["rag"], dependencies=_auth)
 app.include_router(upload.router, prefix="/api/ingest", tags=["ingest"], dependencies=_auth)
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"], dependencies=_auth)

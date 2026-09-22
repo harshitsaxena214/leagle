@@ -24,7 +24,7 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwk, jwt
 from jose.exceptions import ExpiredSignatureError
@@ -94,23 +94,10 @@ def _find_key(kid: str | None, jwks: dict) -> dict | None:
     return keys[0]
 
 
-# ── Core dependency ───────────────────────────────────────────────────────────
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> dict:
+async def verify_clerk_token(token: str) -> dict:
     """
-    FastAPI dependency — returns the decoded Clerk JWT payload.
-    Raises HTTP 401 on any failure.
+    Decodes and verifies a Clerk JWT. Raises HTTP 401 on any failure.
     """
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = credentials.credentials
-
     # Decode header without verification to find the key id
     try:
         header = jwt.get_unverified_header(token)
@@ -183,6 +170,38 @@ async def get_current_user(
             )
 
     return payload
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    """
+    FastAPI dependency — returns the decoded Clerk JWT payload.
+    Raises HTTP 401 on any failure.
+    """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return await verify_clerk_token(credentials.credentials)
+
+
+async def get_current_user_ws(websocket: WebSocket) -> dict | None:
+    """
+    Validates token for WebSocket connections.
+    Returns None on failure instead of raising HTTPException.
+    """
+    token = websocket.query_params.get("token")
+    if not token:
+        return None
+    
+    try:
+        return await verify_clerk_token(token)
+    except HTTPException:
+        return None
 
 
 # ── Admin guard ───────────────────────────────────────────────────────────────
