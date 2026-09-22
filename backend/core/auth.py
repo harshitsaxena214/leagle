@@ -24,7 +24,7 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwk, jwt
 from jose.exceptions import ExpiredSignatureError
@@ -68,7 +68,18 @@ def _get_jwks() -> dict:
 
 
 # ── Bearer scheme ─────────────────────────────────────────────────────────────
-_bearer = HTTPBearer(auto_error=False)
+class SafeHTTPBearer(HTTPBearer):
+    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
+        try:
+            return await super().__call__(request)
+        except HTTPException as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=e.detail,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+_bearer = SafeHTTPBearer(auto_error=False)
 
 
 def _find_key(kid: str | None, jwks: dict) -> dict | None:
