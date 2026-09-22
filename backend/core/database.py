@@ -50,6 +50,11 @@ normalized_database_url = get_async_database_url(settings.database_url)
 # Note: psycopg driver is required for async operations on Neon
 logger.info(f"Connecting to database at {get_masked_url(normalized_database_url)}")
 
+if normalized_database_url.startswith("sqlite"):
+    connect_args = {"timeout": 10}
+else:
+    connect_args = {"connect_timeout": 10}
+
 engine = create_async_engine(
     normalized_database_url,
     echo=False,  # Set to True for SQL logging in debug
@@ -57,7 +62,7 @@ engine = create_async_engine(
     max_overflow=10,
     pool_pre_ping=True,  # Detect stale connections
     pool_recycle=3600,  # Recycle connections every hour
-    connect_args={"timeout": 10},  # Prevent infinite hangs connecting
+    connect_args=connect_args,  # Prevent infinite hangs connecting
 )
 
 # Async session factory
